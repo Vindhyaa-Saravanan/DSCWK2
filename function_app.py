@@ -25,15 +25,9 @@ class Sensor:
         }
 
 async def run_sensor_generation(number_of_records):
-    start_time = time()  # Record the start time
-
     sensors = [Sensor() for _ in range(20)]
     # Run sensor generation asynchronously
     await asyncio.gather(*[sensor.simulate_sensor_reply(number_of_records) for sensor in sensors])
-
-    end_time = time()  # Record the end time
-    total_time_taken = end_time - start_time  # Calculate the total time taken
-    return total_time_taken
 
         
 @app.route(route="task1_datafunction_httptrigger")
@@ -50,7 +44,10 @@ def task1_datafunction_httptrigger(req: func.HttpRequest) -> func.HttpResponse:
             number_of_records = req_body.get('number_of_records')
 
     if number_of_records:
-        time_taken = run_sensor_generation(int(number_of_records))
+        start_time = time()  # Record the start time
+        run_sensor_generation(int(number_of_records))
+        end_time = time()  # Record the end time
+        time_taken = end_time - start_time  # Calculate the total time taken
         return func.HttpResponse(f"Hello, 20 sensors generated {number_of_records} each. Time taken = {time_taken} seconds.")
     else:
         return func.HttpResponse(
