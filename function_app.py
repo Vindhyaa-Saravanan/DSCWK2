@@ -23,12 +23,12 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 # Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
 @app.generic_output_binding(arg_name="toAddSensorData", type="sql", CommandText="dbo.SensorData", ConnectionStringSetting="SqlConnectionString", data_type=DataType.STRING)
 
-# Function and route for Task 1
+# FUNCTION AND ROUTE FOR TASK 1
 @app.function_name(name="task1_datafunction_httptrigger")
 @app.route(route="task1_datafunction_httptrigger")
 def task1_datafunction_httptrigger(req: func.HttpRequest, toAddSensorData: func.Out[func.SqlRowList]) -> func.HttpResponse:
     
-    logging.info('Starting HTTP Trigger Data Function...')
+    logging.info('Starting Data Function...')
 
     # Try to get 
     number_of_records = req.params.get('number_of_records')
@@ -97,3 +97,11 @@ def run_sensor_simulation(number_of_records):
     for sensor in sensors:
         result.extend(sensor.simulate_sensor_reply(number_of_records))
     return result
+
+# FUNCTION AND ROUTE FOR TASK 2
+@app.route(route="task2_statfunction_httptrigger", auth_level=func.AuthLevel.ANONYMOUS)
+def task2_statfunction_httptrigger(req: func.HttpRequest) -> func.HttpResponse:
+    
+    logging.info('Starting Statistic Function...')
+
+    return func.HttpResponse(f"Hello. This HTTP triggered function executed successfully.")
