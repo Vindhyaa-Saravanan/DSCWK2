@@ -1,6 +1,12 @@
 '''
             FUNCTION_APP.PY                     
-Python file Azure Function defined for task 1.
+Python file with Azure Functions 
+defined for Coursework 2.
+
+Functions for specific tasks are as follows:
+# Task 1: task1_datafunction_httptrigger
+# Task 1: task2_statfunction_httptrigger
+# Task 1: task3_datafunction_timertrigger and task3_statfunction_sqltrigger
 
 Name of Student: Vindhyaa Saravanan
 Module: Distributed Systems CWK 2
@@ -14,6 +20,13 @@ import logging
 import datetime
 from random import uniform
 from time import time
+import json
+
+# Defining the value ranges which are constants
+TEMP_RANGE = tuple([8, 15])
+WIND_RANGE = tuple([15, 25])
+HUMID_RANGE = tuple([40, 70])
+CO2_RANGE = tuple([500, 1500])
 
 # Creating instance of the Function App
 app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
@@ -21,12 +34,18 @@ app = func.FunctionApp(http_auth_level=func.AuthLevel.ANONYMOUS)
 # Registering the output binding to the Azure SQL database table dbo.SensorData
 # (refer sql connection string in local.settings.json)
 # Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
-@app.generic_output_binding(arg_name="toAddSensorData", type="sql", CommandText="dbo.SensorData", ConnectionStringSetting="SqlConnectionString", data_type=DataType.STRING)
-
+# Lines 37 to 52 of the example were referred to, for the output binding and the 
+@app.generic_output_binding(
+    arg_name="toSendSensorData", 
+    type="sql", 
+    CommandText="dbo.SensorData", 
+    ConnectionStringSetting="SqlConnectionString", 
+    data_type=DataType.STRING
+)
 # FUNCTION AND ROUTE FOR TASK 1
 @app.function_name(name="task1_datafunction_httptrigger")
 @app.route(route="task1_datafunction_httptrigger")
-def task1_datafunction_httptrigger(req: func.HttpRequest, toAddSensorData: func.Out[func.SqlRowList]) -> func.HttpResponse:
+def task1_datafunction_httptrigger(req: func.HttpRequest, toSendSensorData: func.Out[func.SqlRowList]) -> func.HttpResponse:
     
     logging.info('Starting Data Function...')
 
@@ -47,15 +66,17 @@ def task1_datafunction_httptrigger(req: func.HttpRequest, toAddSensorData: func.
         # Run sensor simulation and add the new data to the database, checking time before and after
         logging.info('Starting sensor simulation...')
         start_time = time()
-        toAddSensorData.set(run_sensor_simulation(int(number_of_records)))
+        toSendSensorData.set(run_sensor_simulation(int(number_of_records)))
         end_time = time()
         
         # Calculating response time taken
         time_taken = end_time - start_time  
         
-        # Log info about successful function call and return HTTP response
+        # Log info about successful function call and return HTTP response, with success code
         logging.info('20 sensors generated {number_of_records} each. Time taken = {time_taken} seconds.')
-        return func.HttpResponse(f"Hello, 20 sensors generated {number_of_records} each. Time taken = {time_taken} seconds.")
+        return func.HttpResponse(
+            f"Hello, 20 sensors generated {number_of_records} each. Time taken = {time_taken} seconds.",
+            status_code=200)
     
     else:
         # Return Bad Request (Code 400) and explain need for 'number_of_records' parameter
@@ -69,10 +90,6 @@ def task1_datafunction_httptrigger(req: func.HttpRequest, toAddSensorData: func.
 class Sensor:
     # Method to initialize a sensor object
     def __init__(self, sensor_id):
-        self.TEMP_RANGE = (8, 12)
-        self.WIND_RANGE = (15, 25)
-        self.HUMID_RANGE = (40, 70)
-        self.CO2_RANGE = (500, 1500)
         self.sensor_id = sensor_id
 
     # Method for sensor to produce a number_of_records/rows of the database
@@ -84,10 +101,10 @@ class Sensor:
         return func.SqlRow(
         SensorId=self.sensor_id,
         Timestamp=str(datetime.datetime.utcnow()),
-        Temperature=uniform(*self.TEMP_RANGE),
-        WindSpeed=uniform(*self.WIND_RANGE),
-        RelativeHumidity=uniform(*self.HUMID_RANGE),
-        CO2=uniform(*self.CO2_RANGE)
+        Temperature=uniform(*TEMP_RANGE),
+        WindSpeed=uniform(*WIND_RANGE),
+        RelativeHumidity=uniform(*HUMID_RANGE),
+        CO2=uniform(*CO2_RANGE)
     )
 
 # Function to run 20 sensors and combine the data received from them
@@ -99,9 +116,68 @@ def run_sensor_simulation(number_of_records):
     return result
 
 # FUNCTION AND ROUTE FOR TASK 2
+# Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
+# Lines 13 to 32 of the example were referred to, for the input binding and the function response returning, etc.
+@app.generic_input_binding(
+    arg_name="toReadSensorData",
+    type="sql",
+    CommandText="SELECT * FROM SensorData",
+    CommandType="Text",
+    ConnectionStringSetting="SqlConnectionString",
+    data_type=DataType.STRING
+)
+# FUNCTION AND ROUTE FOR TASK 2
 @app.route(route="task2_statfunction_httptrigger", auth_level=func.AuthLevel.ANONYMOUS)
-def task2_statfunction_httptrigger(req: func.HttpRequest) -> func.HttpResponse:
+def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func.SqlRowList) -> func.HttpResponse:
     
     logging.info('Starting Statistic Function...')
+    
+    # Converting each SqlRow in data_from_db to a dictionary,
+    # where keys are the DB columns, values are the DB values
+    records = [json.loads(row.to_json()) for row in toReadSensorData]
+    
+    # Creating a new dictionary to store sensor IDs and their corresponding lists of rows
+    sorted_per_sensor = {}
+    # For each row of data, check if a appropriate list exists for that sensor,
+    # if not, add the list at the same index, then append the row to that list
+    for record in records:
+        sensor_id = record['SensorId']
+        if sensor_id not in sorted_per_sensor:
+            sorted_per_sensor[sensor_id] = []
+        sorted_per_sensor[sensor_id].append(record)
+    
+    # Create dictionary to store the final result to be sent
+    final_result = {}
+    # For each sensor and its set of data
+    for sensor_id, set_of_records in sorted_per_sensor.items():
+        all_temperatures = [record['Temperature'] for record in set_of_records]
+        all_wind_speeds = [record['WindSpeed'] for record in set_of_records]
+        all_humidities = [record['RelativeHumidity'] for record in set_of_records]
+        all_co2_levels = [record['CO2'] for record in set_of_records]
 
-    return func.HttpResponse(f"Hello. This HTTP triggered function executed successfully.")
+        # Prepare statistics for each sensor
+        sensor_stats = {
+            'SensorId': sensor_id,
+            'MeanTemperature': sum(all_temperatures) / len(all_temperatures),
+            'MeanWindSpeed': sum(all_wind_speeds) / len(all_wind_speeds),
+            'MeanRelativeHumidity': sum(all_humidities) / len(all_humidities),
+            'MeanCO2': sum(all_co2_levels) / len(all_co2_levels),
+            'MaxTemperature': max(all_temperatures),
+            'MaxWindSpeed': max(all_wind_speeds),
+            'MaxRelativeHumidity': max(all_humidities),
+            'MaxCO2': max(all_co2_levels),
+            'MinTemperature': min(all_temperatures),
+            'MinWindSpeed': min(all_wind_speeds),
+            'MinRelativeHumidity': min(all_humidities),
+            'MinCO2': min(all_co2_levels),
+        }
+        
+        # Add to the final dictionary
+        final_result[f"Sensor_{sensor_id}"] = sensor_stats
+        
+    # Return JSON to be displayed with the statistics
+    return func.HttpResponse(
+        json.dumps(final_result, indent=2),
+        status_code=200,
+        mimetype="application/json"
+    )
