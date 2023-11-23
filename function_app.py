@@ -115,6 +115,7 @@ def run_sensor_simulation(number_of_records):
         result.extend(sensor.simulate_sensor_reply(number_of_records))
     return result
 
+
 # FUNCTION AND ROUTE FOR TASK 2
 # Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
 # Lines 13 to 32 of the example were referred to, for the input binding and the function response returning, etc.
@@ -147,6 +148,19 @@ def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func
         sorted_per_sensor[sensor_id].append(record)
     
     # Create dictionary to store the final result to be sent
+    final_result = calculate_stats_for_sensor_sets(sorted_per_sensor)
+        
+    # Return JSON to be displayed with the statistics
+    return func.HttpResponse(
+        json.dumps(final_result, indent=2),
+        status_code=200,
+        mimetype="application/json"
+    )
+    
+# Function to calculate statistics per sensor given dictionary of records sorted by sensor
+# Created function to encapsulate this functionality as used frequently
+def calculate_stats_for_sensor_sets(sorted_per_sensor):
+    # Create dictionary to store the final result to be sent
     final_result = {}
     # For each sensor and its set of data
     for sensor_id, set_of_records in sorted_per_sensor.items():
@@ -175,16 +189,12 @@ def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func
         # Add to the final dictionary
         final_result[f"Sensor_{sensor_id}"] = sensor_stats
         
-    # Return JSON to be displayed with the statistics
-    return func.HttpResponse(
-        json.dumps(final_result, indent=2),
-        status_code=200,
-        mimetype="application/json"
-    )
+    return final_result
+
 
 # Registering new output binding to the Azure SQL database table dbo.SensorData for Task 3
 # Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
-# Lines 37 to 52 of the example were referred to, for the output binding and the 
+# Lines 37 to 52 of the example were referred to, for the output binding
 @app.generic_output_binding(
     arg_name="toSendSensorDataTask3", 
     type="sql", 
@@ -192,6 +202,7 @@ def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func
     ConnectionStringSetting="SqlConnectionString", 
     data_type=DataType.STRING
 )
+# FUNCTION FOR TASK 3 - DATA FUNCTION
 @app.timer_trigger(schedule="0 */30 * * * *", arg_name="myTimer", run_on_startup=True,use_monitor=False) 
 def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorDataTask3: func.Out[func.SqlRowList]) -> None:
     
@@ -202,3 +213,54 @@ def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorData
     current_time = datetime.datetime.now()
     toSendSensorDataTask3.set(run_sensor_simulation(1))
     logging.info(f'Task 3 Data Function has added records at {current_time}')
+    
+    
+    
+# Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
+# Lines 54 to 62 of the example were referred to, for the generic trigger
+@app.generic_trigger(arg_name="SQLDatabaseTrigger", 
+                     type="sqlTrigger",
+                     TableName="SensorData",
+                     ConnectionStringSetting="SqlConnectionString",
+                     data_type=DataType.STRING)
+# New input binding for Task 3
+# Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
+# Lines 13 to 32 of the example were referred to, for the input binding
+@app.generic_input_binding(
+    arg_name="toReadSensorData_Task3",
+    type="sql",
+    CommandText="SELECT * FROM SensorData",
+    CommandType="Text",
+    ConnectionStringSetting="SqlConnectionString",
+    data_type=DataType.STRING
+)
+# FUNCTION FOR TASK 3 - STATISTIC FUNCTION
+@app.function_name(name="task3_statfunction_sqltrigger")
+def task3_statfunction_sqltrigger(SQLDatabaseTrigger: str, toReadSensorData_Task3: func.SqlRowList) -> None:
+    
+    # Log that a change has occurred and thus triggered function
+    logging.info("Change detected in SensorData table, triggering Task 3 Statistics Function...")
+    
+    # Converting each SqlRow in data_from_db to a dictionary,
+    # where keys are the DB columns, values are the DB values
+    records = [json.loads(row.to_json()) for row in toReadSensorData_Task3]
+    
+    # Creating a new dictionary to store sensor IDs and their corresponding lists of rows
+    sorted_per_sensor = {}
+    # For each row of data, check if a appropriate list exists for that sensor,
+    # if not, add the list at the same index, then append the row to that list
+    for record in records:
+        sensor_id = record['SensorId']
+        if sensor_id not in sorted_per_sensor:
+            sorted_per_sensor[sensor_id] = []
+        sorted_per_sensor[sensor_id].append(record)
+    
+    # Create dictionary to store the final result to be sent
+    final_result = calculate_stats_for_sensor_sets(sorted_per_sensor)
+        
+    # Log the final statistics
+    # Unfortunately this output has to be returned to the log stream as returning
+    # a HTTP response is not possible with a SQL-triggered Azure Function
+    logging.info("Sensor Data Statistics: %s", json.dumps(final_result, indent=2))
+    
+    
