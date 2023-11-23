@@ -181,3 +181,12 @@ def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func
         status_code=200,
         mimetype="application/json"
     )
+
+@app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=True,
+              use_monitor=False) 
+def task3_datafunction_timertrigger(myTimer: func.TimerRequest) -> None:
+    
+    if myTimer.past_due:
+        logging.info('The timer is past due!')
+
+    logging.info('Python timer trigger function executed.')
