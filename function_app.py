@@ -182,11 +182,23 @@ def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func
         mimetype="application/json"
     )
 
-@app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=True,
-              use_monitor=False) 
-def task3_datafunction_timertrigger(myTimer: func.TimerRequest) -> None:
+# Registering new output binding to the Azure SQL database table dbo.SensorData for Task 3
+# Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
+# Lines 37 to 52 of the example were referred to, for the output binding and the 
+@app.generic_output_binding(
+    arg_name="toSendSensorDataTask3", 
+    type="sql", 
+    CommandText="dbo.SensorData", 
+    ConnectionStringSetting="SqlConnectionString", 
+    data_type=DataType.STRING
+)
+@app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=True,use_monitor=False) 
+def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorDataTask3: func.Out[func.SqlRowList]) -> None:
     
     if myTimer.past_due:
         logging.info('The timer is past due!')
-
-    logging.info('Python timer trigger function executed.')
+        
+    # Send exactly one record per sensor to the database
+    current_time = datetime.datetime.now()
+    toSendSensorDataTask3.set(run_sensor_simulation(1))
+    logging.info(f'Task 3 Data Function has added records at {current_time}')
