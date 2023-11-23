@@ -192,7 +192,7 @@ def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func
     ConnectionStringSetting="SqlConnectionString", 
     data_type=DataType.STRING
 )
-@app.timer_trigger(schedule="0 */5 * * * *", arg_name="myTimer", run_on_startup=True,use_monitor=False) 
+@app.timer_trigger(schedule="0 */30 * * * *", arg_name="myTimer", run_on_startup=True,use_monitor=False) 
 def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorDataTask3: func.Out[func.SqlRowList]) -> None:
     
     if myTimer.past_due:
