@@ -203,7 +203,10 @@ def calculate_stats_for_sensor_sets(sorted_per_sensor):
     data_type=DataType.STRING
 )
 # FUNCTION FOR TASK 3 - DATA FUNCTION
-@app.timer_trigger(schedule="0 */30 * * * *", arg_name="myTimer", run_on_startup=True,use_monitor=False) 
+@app.timer_trigger(schedule="0 */5 * * * *", 
+                   arg_name="myTimer", 
+                   run_on_startup=False,
+                   use_monitor=True) 
 def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorDataTask3: func.Out[func.SqlRowList]) -> None:
     
     if myTimer.past_due:
@@ -222,12 +225,13 @@ def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorData
                      type="sqlTrigger",
                      TableName="SensorData",
                      ConnectionStringSetting="SqlConnectionString",
-                     data_type=DataType.STRING)
+                     data_type=DataType.STRING,
+                     route="task3_statfunction_sqltrigger")
 # New input binding for Task 3
 # Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
 # Lines 13 to 32 of the example were referred to, for the input binding
 @app.generic_input_binding(
-    arg_name="toReadSensorData_Task3",
+    arg_name="toReadSensorDataTask3",
     type="sql",
     CommandText="SELECT * FROM SensorData",
     CommandType="Text",
@@ -236,14 +240,15 @@ def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorData
 )
 # FUNCTION FOR TASK 3 - STATISTIC FUNCTION
 @app.function_name(name="task3_statfunction_sqltrigger")
-def task3_statfunction_sqltrigger(SQLDatabaseTrigger: str, toReadSensorData_Task3: func.SqlRowList) -> None:
+def task3_statfunction_sqltrigger(SQLDatabaseTrigger, toReadSensorDataTask3: func.SqlRowList) -> None:
     
     # Log that a change has occurred and thus triggered function
-    logging.info("Change detected in SensorData table, triggering Task 3 Statistics Function...")
+    logging.info("Change detected in SensorData table: %s", json.dumps(SQLDatabaseTrigger, indent=2))
+    logging.info("Triggering Task 3 Statistics Function...")
     
     # Converting each SqlRow in data_from_db to a dictionary,
     # where keys are the DB columns, values are the DB values
-    records = [json.loads(row.to_json()) for row in toReadSensorData_Task3]
+    records = [json.loads(row.to_json()) for row in toReadSensorDataTask3]
     
     # Creating a new dictionary to store sensor IDs and their corresponding lists of rows
     sorted_per_sensor = {}
