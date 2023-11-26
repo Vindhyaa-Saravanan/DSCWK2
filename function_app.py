@@ -128,6 +128,7 @@ def run_sensor_simulation(number_of_records):
     data_type=DataType.STRING
 )
 # FUNCTION AND ROUTE FOR TASK 2
+@app.function_name(name="task2_statfunction_httptrigger")
 @app.route(route="task2_statfunction_httptrigger", auth_level=func.AuthLevel.ANONYMOUS)
 def task2_statfunction_httptrigger(req: func.HttpRequest, toReadSensorData: func.SqlRowList) -> func.HttpResponse:
     
@@ -203,6 +204,7 @@ def calculate_stats_for_sensor_sets(sorted_per_sensor):
     data_type=DataType.STRING
 )
 # FUNCTION FOR TASK 3 - DATA FUNCTION
+@app.function_name(name="task3_datafunction_timertrigger")
 @app.timer_trigger(schedule="0 */5 * * * *", 
                    arg_name="myTimer", 
                    run_on_startup=False,
@@ -238,6 +240,8 @@ def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorData
     ConnectionStringSetting="SqlConnectionString",
     data_type=DataType.STRING
 )
+
+
 # FUNCTION FOR TASK 3 - STATISTIC FUNCTION
 @app.function_name(name="task3_statfunction_sqltrigger")
 def task3_statfunction_sqltrigger(SQLDatabaseTrigger, toReadSensorDataTask3: func.SqlRowList) -> None:
