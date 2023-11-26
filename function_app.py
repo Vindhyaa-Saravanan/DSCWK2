@@ -5,8 +5,8 @@ defined for Coursework 2.
 
 Functions for specific tasks are as follows:
 # Task 1: task1_datafunction_httptrigger
-# Task 1: task2_statfunction_httptrigger
-# Task 1: task3_datafunction_timertrigger and task3_statfunction_sqltrigger
+# Task 2: task2_statfunction_httptrigger
+# Task 3: task3_datafunction_timertrigger and task3_statfunction_sqltrigger
 
 Name of Student: Vindhyaa Saravanan
 Module: Distributed Systems CWK 2
