@@ -216,13 +216,18 @@ def task3_datafunction_timertrigger(myTimer: func.TimerRequest, toSendSensorData
         
     # Send exactly one record per sensor to the database
     current_time = datetime.datetime.now()
-    toSendSensorDataTask3.set(run_sensor_simulation(1))
-    logging.info(f'Task 3 Data Function has added records at {current_time}')
+    required_sensor_simulation = run_sensor_simulation(1)
     
+    # New data sent to database using exactly one operation 
+    # to ensure sql trigger is triggered only once
+    toSendSensorDataTask3.set(required_sensor_simulation)
+    logging.info(f'Task 3 Data Function has added records at {current_time}')
+
     
     
 # Referred to this example: https://github.com/Azure/azure-functions-sql-extension/tree/main/samples/samples-python-v2
 # Lines 54 to 62 of the example were referred to, for the generic trigger
+# Also, have attempted to ensure trigger only once for addition of all 20 rows using Sql_Trigger_BatchSize
 @app.generic_trigger(arg_name="SQLDatabaseTrigger", 
                      type="sqlTrigger",
                      TableName="SensorData",
@@ -249,11 +254,11 @@ def task3_statfunction_sqltrigger(SQLDatabaseTrigger, toReadSensorDataTask3: fun
     # Log that a change has occurred and thus triggered function
     logging.info("Change detected in SensorData table: %s", json.dumps(SQLDatabaseTrigger, indent=2))
     logging.info("Triggering Task 3 Statistics Function...")
-    
+        
     # Converting each SqlRow in data_from_db to a dictionary,
     # where keys are the DB columns, values are the DB values
     records = [json.loads(row.to_json()) for row in toReadSensorDataTask3]
-    
+        
     # Creating a new dictionary to store sensor IDs and their corresponding lists of rows
     sorted_per_sensor = {}
     # For each row of data, check if a appropriate list exists for that sensor,
@@ -263,10 +268,10 @@ def task3_statfunction_sqltrigger(SQLDatabaseTrigger, toReadSensorDataTask3: fun
         if sensor_id not in sorted_per_sensor:
             sorted_per_sensor[sensor_id] = []
         sorted_per_sensor[sensor_id].append(record)
-    
+        
     # Create dictionary to store the final result to be sent
     final_result = calculate_stats_for_sensor_sets(sorted_per_sensor)
-        
+            
     # Log the final statistics
     # Unfortunately this output has to be returned to the log stream as returning
     # a HTTP response is not possible with a SQL-triggered Azure Function
